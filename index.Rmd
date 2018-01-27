@@ -1,0 +1,108 @@
+---
+title: "Detecting Correct Barbell Lifts"
+author: "N. Ames"
+date: "January 24, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This project aims to predict how a person is lifting a barbell based on sensors mounted on their belt, arm, and the barbell. The sensor data was acquired by Velloso, et. al.
+
+### Download Data
+
+The test and training data sets have already been created by the instructors. First, I download the training data set.
+
+```{r}
+trainDest = 'pml-training.csv'
+
+if (!file.exists(trainDest))
+{
+    download.file(url = 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv',
+                  destfile = trainDest)
+}
+training <- read.csv(trainDest,
+                     na.strings = c("NA", "#DIV/0!"))
+```
+
+### Data Cleaning 
+
+Next, the data is cleaned. First, I remove columns that don't appear to contain training data. 
+
+```{r}
+
+training2 <- subset(training, select = -c(X, raw_timestamp_part_1,
+                                          raw_timestamp_part_2,
+                                          cvtd_timestamp,
+                                          new_window, num_window))
+```
+
+There are several columns that appear to be summary columns. These columns have NA values in the first row of the data set, so they are easy to filter out. Additionally, the test data does not have data in these columns, so there is no reason to carry them around.
+```{r}
+rmCols <- is.na(training2[1,])
+training2 <- training2[,!rmCols]
+dim(training2)
+```
+
+### Pre-Processing
+
+At this point, there are 53 predictors. I pre-process the data using PCA to reduce the number of predictors to 20.
+
+```{r}
+library(caret)
+trainPredictors <- subset(training2, select=-c(classe))
+preProc <- preProcess(trainPredictors, thresh=0.9, method="pca")
+preProc
+trainPC <- predict(preProc,trainPredictors)
+```
+
+### Model Training
+
+I have chosen to use a random forest model. Cross-validation is not necessary with this particular random forest model. The confusion matrix shows very low errors for the model. The out-of-bag estimate of error rate is 1.69%. I'm satisfied with this estimate, so will not process the data further. 
+
+```{r}
+library(randomForest)
+set.seed(12321)
+modRF <- randomForest(x=trainPC, y=training2$classe)
+modRF
+```
+
+
+### Test set
+
+I load the test data set and clean the data exactly as I cleaned the training data. Note that the final column is the "problem_id", which does not exist in the training set, so I remove it as well.
+
+```{r}
+testDest = 'pml-testing.csv'
+
+if (!file.exists(testDest))
+{
+    download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", 
+                  destfile = testDest)
+}
+testing <- read.csv(testDest)
+
+testing2 <- subset(testing, select = -c(X, raw_timestamp_part_1,
+                                         raw_timestamp_part_2,
+                                         cvtd_timestamp, new_window, 
+                                         num_window))
+
+testing2 <- testing2[,!rmCols]
+testing2 <- testing2[,-ncol(testing2)]
+```
+
+Next, I apply the pre-processor from the training set and predict the test classe from the random forest model.
+
+```{r}
+testPC <- predict(preProc,testing2)
+testClassePred <- predict(modRF,testPC)
+testClassePred
+```
+
+
+
+## Reference
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013. http://groupware.les.inf.puc-rio.br/har
