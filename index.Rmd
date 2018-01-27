@@ -98,7 +98,6 @@ Next, I apply the pre-processor from the training set and predict the test class
 ```{r}
 testPC <- predict(preProc,testing2)
 testClassePred <- predict(modRF,testPC)
-testClassePred
 ```
 
 
